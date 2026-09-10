@@ -1,0 +1,64 @@
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build site layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf dist
+          mkdir -p dist/images/players dist/scripts
+          cp index.html app.js styles.css README.md dist/
+          touch dist/.nojekyll
+          cp scripts/validate-game.cjs dist/scripts/
+          for f in \
+            aki.webp b45.png blonde-s1-2.webp bubby.png buzzer-s1-2.webp \
+            cj-s1-2.webp cj-s17.jpg energy-s17.png jude.webp kanyuri-s1-2.webp \
+            kuhdd.webp lucy-s17.png noir-s2-5.webp perko-s1.webp pillow-s1-5.webp \
+            pomenmai.png rac-s11.webp rac-s17.png sawoo-s1-2.webp skw.png \
+            static1.webp static2.webp static3.webp turbo.webp yoboy-s1-8.webp; do
+            test -f "$f"
+            cp "$f" dist/images/players/"$f"
+          done
+
+      - name: Validate v1.04
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check dist/app.js
+          (cd dist && node scripts/validate-game.cjs)
+          grep -q 'FANTASY DRAFT' dist/index.html
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
